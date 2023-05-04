@@ -1,73 +1,97 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from np.linalg import norm
+from numpy.linalg import norm
 import matplotlib.pyplot as plt
 import argparse
-from scipy.interpolate import interp1d
+from scipy.interpolate import RegularGridInterpolator
 from scipy.constants import speed_of_light, epsilon_0
 
 p = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     description='Numerical solution to Jefimenko equations')
-p.add_argument('-rho', type=str, required=True,
-               help='Numpy file with 4D charge density scalar (t,x,y,z)')
-p.add_argument('-J', type=str, required=True,
-               help='Numpy file with 5D current density vector (t,dim,x,y,z)')
-p.add_argument('-t', type=str, required=True,
-               help='Numpy file with times for rho and J')
-p.add_argument('-dx', type=float, nargs=3, required=True,
-               help='Grid spacing of rho and J data (their origin is 0)')
+p.add_argument('-npz', type=str, required=True,
+               help='''Numpy file with 4D charge density scalar rho(t,x,y,z),
+               5D current density vector J(t,dim,x,y,z), time array t and
+               grid coordinate arrays x, y, z''')
 p.add_argument('-observation_points', type=float, nargs='+', required=True,
                help='N*3 coordinates of outside observation points')
 args = p.parse_args()
 
-t = np.load(args.t)
-rho_samples = np.load(args.rho)
-J_samples = np.load(args.J)
+npz_file = np.load(args.npz)
+t = npz_file['t']
+x, y, z = npz_file['x'], npz_file['y'], npz_file['z']
+rho_samples = npz_file['rho']
+J_samples = npz_file['J']
+# Assume constant dx
+dx = np.array([x[1] - x[0], y[1] - y[0], z[1] - z[0]])
 grid_size = rho_samples.shape[1:]
+grid_coordinates = np.meshgrid(x, y, z, indexing='ij', sparse=True)
 
 rho_deriv = np.gradient(rho_samples, t, axis=0)
 J_deriv = np.gradient(J_samples, t, axis=0)
+Jx_deriv, Jy_deriv, Jz_deriv = J_deriv[:, 0], J_deriv[:, 1], J_deriv[:, 2]
 
-# TODO: use RegularGridInterpolator (a bit overkill, since we do not interpolate
-# in space, but the only way to vectorize time interpolation?)
-drho_dt = interp1d(t, rho_deriv, axis=0)
+# RegularGridInterpolator is a bit overkill, since we do not interpolate in
+# space, but the only way to vectorize time interpolation
+drho_dt = RegularGridInterpolator((t, x, y, z), rho_deriv)
+dJx_dt = RegularGridInterpolator((t, x, y, z), Jx_deriv)
+dJy_dt = RegularGridInterpolator((t, x, y, z), Jy_deriv)
+dJz_dt = RegularGridInterpolator((t, x, y, z), Jy_deriv)
 
-# TODO: split J into components?
-dJ_dt = interp1d(t, J_deriv, axis=0)
-
-domain_size = args.dx * rho_samples.shape[1:]
-dV = np.product(args.dx)
+dV = np.product(dx)
 r_obs = np.reshape(args.observation_points, [-1, 3])
 n_obs_points = len(r_obs)
 
 # Compute delays per grid point for each observation point
-grid_coordinates = TODO
-delays = np.zeros(n_obs_points, *grid_size)
+delays = np.zeros((n_obs_points, *grid_size))
 
 for i, r in enumerate(r_obs):
-    delays[i] = (r - grid_coordinates)/speed_of_light
+    for dim in range(3):
+        delays[i] = delays[i] + (r[dim] - grid_coordinates[dim])**2
+    delays[i] = np.sqrt(delays[i])/speed_of_light
 
 # Observation time range
-dt = (t.max() - t.min()) / (len(t) - 1)
-t_obs = np.arange(t.min() + delays.min(),
-                  t.max() + delays.max(), dt)
-n_obs_times = len(t_obs)
+n_obs_times = len(t)            # TODO: have more options
+t_obs = np.linspace(t.min()+delays.max(), t.max()-delays.max(), n_obs_times)
 
-E_obs = np.zeros(n_obs_times, n_obs_points, 3)
+E_obs = np.zeros((n_obs_points, n_obs_times, 3))
 factors = 1 / (4 * np.pi * epsilon_0 * speed_of_light * norm(r_obs, axis=1))
+
+coords = grid_coordinates
+coords.insert(0, [])            # Dummy entry for time values
 
 for k, t in enumerate(t_obs):
     for i, r in enumerate(r_obs):
-        t_source = t - delays[i]
+        coords[0] = t - delays[i]
+        coords_tuple = tuple(coords)
 
         # Approximate unit vector from observation to source (since source
         # region is much smaller than norm(r))
         r_hat = -r / norm(r)
 
         # Interpolate at every grid point at the given t_source
-        rho_term = r_hat (TODO outer product) drho_dt(t_source)
-        J_term = dJ_dt(t_source) / speed_of_light
+        rho_term = drho_dt(coords_tuple)
+        Jx_term = dJx_dt(coords_tuple) / speed_of_light
+        Jy_term = dJy_dt(coords_tuple) / speed_of_light
+        Jz_term = dJz_dt(coords_tuple) / speed_of_light
 
-        E_obs[k, i] = E_obs[k, i] + dV * factors[i] * (rho_term - J_term)
+        E_obs[i, k, 0] = E_obs[i, k, 0] + dV * factors[i] * \
+            np.sum(r_hat[0] * rho_term - Jx_term)
+        E_obs[i, k, 1] = E_obs[i, k, 1] + dV * factors[i] * \
+            np.sum(r_hat[1] * rho_term - Jy_term)
+        E_obs[i, k, 2] = E_obs[i, k, 2] + dV * factors[i] * \
+            np.sum(r_hat[2] * rho_term - Jz_term)
+
+fig, ax = plt.subplots(n_obs_points, sharex=True)
+if not hasattr(ax, 'size'):
+    ax = [ax]
+
+for i, r in enumerate(r_obs):
+    ax[i].plot(t_obs, E_obs[i, :, 0], label='Ex')
+    ax[i].plot(t_obs, E_obs[i, :, 1], label='Ey')
+    ax[i].plot(t_obs, E_obs[i, :, 2], label='Ez')
+    ax[i].legend()
+    ax[i].set_title(f'Observer {i+1} at {r}')
+
+plt.show()

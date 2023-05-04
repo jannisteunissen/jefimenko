@@ -3,30 +3,28 @@ from scipy.constants import speed_of_light
 
 # Domain dimensions and time arrays
 ndim = 3
-Nt, Nx, Ny, Nz = 100, 20, 10, 15
+Nt, Nx, Ny, Nz = 100, 23, 20, 25
 lx, ly, lz = 1.0, 1.0, 1.0
 x = np.linspace(0, lx, Nx)
 y = np.linspace(0, ly, Ny)
 z = np.linspace(0, lz, Nz)
-xx, yy, zz = np.meshgrid(x, y, z)
-dX = [x/y for x, y in zip([lx, ly, lz], [Nx, Ny, Nz])]
-print("dx, dy, dz = ", dX)
+xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
 
 tstart, tend = 0.0, 2.0
-t = np.linspace(tstart, tend, Nt)
+t = np.linspace(tstart, tend, Nt+1)
 
 # Case 1
 
 
 def rho_spat(X, Y, Z, t):
-    if t < 0:
+    if t < 0.5*(tstart+tend):
         return np.zeros(X.shape)
     else:
         return np.ones(X.shape)
 
 
 def J_spat(X, Y, Z, t):
-    if t < 0:
+    if t < 0.5*(tstart+tend):
         return [np.zeros(X.shape), np.zeros(Y.shape), np.zeros(Z.shape)]
     else:
         return [np.ones(X.shape), np.ones(Y.shape), np.ones(Z.shape)]
@@ -42,12 +40,8 @@ for i, time in enumerate(t):
 print("Case 1:", np.array(rho).shape, np.array(J).shape)
 
 # Saving all the needed data
-np.savez_compressed("case1_time.npz", t)
-np.savez_compressed("case1_rho.npz", rho)
-np.savez_compressed("case1_J.npz", J)
-
-# Case 2
-
+np.savez_compressed("case1.npz", t=t, rho=np.array(rho), J=np.array(J),
+                    x=x, y=y, z=z)
 
 V = 0
 f = 2
@@ -78,9 +72,8 @@ for i, time in enumerate(t):
 print("Case 2:", np.array(rho).shape, np.array(J).shape)
 
 # Saving all the needed data
-np.savez_compressed("case2_time.npz", t)
-np.savez_compressed("case2_rho.npz", rho)
-np.savez_compressed("case2_J.npz", J)
+np.savez_compressed("case2.npz", t=t, rho=np.array(rho), J=np.array(J),
+                    x=x, y=y, z=z)
 
 # Case 3
 
@@ -114,6 +107,5 @@ for i, time in enumerate(t):
 print("Case 3:", np.array(rho).shape, np.array(J).shape)
 
 # Saving all the needed data
-np.savez_compressed("case3_time.npz", t)
-np.savez_compressed("case3_rho.npz", rho)
-np.savez_compressed("case3_J.npz", J)
+np.savez_compressed("case3.npz", t=t, rho=np.array(rho), J=np.array(J),
+                    x=x, y=y, z=z)
