@@ -37,7 +37,7 @@ Jx_deriv, Jy_deriv, Jz_deriv = J_deriv[:, 0], J_deriv[:, 1], J_deriv[:, 2]
 drho_dt = RegularGridInterpolator((t, x, y, z), rho_deriv, bounds_error=False)
 dJx_dt = RegularGridInterpolator((t, x, y, z), Jx_deriv, bounds_error=False)
 dJy_dt = RegularGridInterpolator((t, x, y, z), Jy_deriv, bounds_error=False)
-dJz_dt = RegularGridInterpolator((t, x, y, z), Jy_deriv, bounds_error=False)
+dJz_dt = RegularGridInterpolator((t, x, y, z), Jz_deriv, bounds_error=False)
 
 dV = np.product(dx)
 r_obs = np.reshape(args.observation_points, [-1, 3])
@@ -46,10 +46,13 @@ n_obs_points = len(r_obs)
 # Compute delays per grid point for each observation point
 delays = np.zeros((n_obs_points, *grid_size))
 
+# Vectors r - r' for each grid point and each observation point
+r_diff = np.zeros((n_obs_points, 3, *grid_size))
+
 for i, r in enumerate(r_obs):
     for dim in range(3):
-        delays[i] = delays[i] + (r[dim] - grid_coordinates[dim])**2
-    delays[i] = np.sqrt(delays[i])/speed_of_light
+        r_diff[i, dim] = r[dim] - grid_coordinates[dim]
+    delays[i] = norm(r_diff[i], axis=0)/speed_of_light
 
 E_obs = []
 coords = grid_coordinates
@@ -62,28 +65,31 @@ for i, r in enumerate(r_obs):
                         n_obs_times)
 
     E_obs.append(np.zeros((n_obs_times, 3)))
-    factor = 1 / (4 * np.pi * epsilon_0 * speed_of_light * norm(r_obs[i]))
+
+    # Re-use norm or r_diff that was already computed
+    R = delays[i] * speed_of_light
+    factor = 1 / (4 * np.pi * epsilon_0 * speed_of_light * R)
+    r_hat = r_diff[i] / R
 
     for k, t_o in enumerate(t_obs):
+        # Time at source
         coords[0] = t_o - delays[i]
         coords_tuple = tuple(coords)
-
-        # Approximate unit vector from observation to source (since source
-        # region is much smaller than norm(r))
-        r_hat = -r / norm(r)
 
         # Interpolate at every grid point at the given t_source
         rho_term = drho_dt(coords_tuple)
         Jx_term = dJx_dt(coords_tuple) / speed_of_light
         Jy_term = dJy_dt(coords_tuple) / speed_of_light
         Jz_term = dJz_dt(coords_tuple) / speed_of_light
+        a = 1
+        b = 1
 
-        E_obs[i][k, 0] = E_obs[i][k, 0] + dV * factor * \
-            np.sum(r_hat[0] * rho_term - Jx_term)
-        E_obs[i][k, 1] = E_obs[i][k, 1] + dV * factor * \
-            np.sum(r_hat[1] * rho_term - Jy_term)
-        E_obs[i][k, 2] = E_obs[i][k, 2] + dV * factor * \
-            np.sum(r_hat[2] * rho_term - Jz_term)
+        E_obs[i][k, 0] = E_obs[i][k, 0] + dV * \
+            np.sum(factor * (a * r_hat[0] * rho_term - b * Jx_term))
+        E_obs[i][k, 1] = E_obs[i][k, 1] + dV * \
+            np.sum(factor * (a * r_hat[1] * rho_term - b * Jy_term))
+        E_obs[i][k, 2] = E_obs[i][k, 2] + dV * \
+            np.sum(factor * (a * r_hat[2] * rho_term - b * Jz_term))
 
 # for i, r in enumerate(r_obs):
 #     # Converting to spherical co-ords

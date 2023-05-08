@@ -1,10 +1,14 @@
 import numpy as np
 from scipy.constants import speed_of_light
+import matplotlib.pyplot as plt
 
 # Domain dimensions and time arrays
 ndim = 3
-# Nt, Nx, Ny, Nz = 200, 50, 50, 50
-Nt, Nx, Ny, Nz = 50, 50, 50, 50
+# Nt, Nx, Ny, Nz = 50, 50, 50, 50
+# Nt, Nx, Ny, Nz = 100, 17, 17, 17
+Nt, Nx, Ny, Nz = 50, 33, 33, 33
+# Nt, Nx, Ny, Nz = 50, 17, 17, 17
+# Nt, Nx, Ny, Nz = 50, 9, 9, 9
 
 tstart, tend = 0.0, 1e-6
 t = np.linspace(tstart, tend, Nt)
@@ -14,7 +18,7 @@ x = np.linspace(-lx/2, lx/2, Nx)
 y = np.linspace(-ly/2, ly/2, Ny)
 z = np.linspace(-lz/2, lz/2, Nz)
 xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
-
+dV = (x[1] - x[0]) * (y[1] - y[0]) * (z[1] - z[0])
 
 # Case 1
 def rho_spat(X, Y, Z, t):
@@ -42,14 +46,14 @@ np.savez("case1.npz", t=t, rho=rho, J=J, x=x, y=y, z=z)
 
 V = 0
 f = 2.0/(tend-tstart)
-d = 0.025*lz
+d = 0.2*lz
 sigma = 0.2 * min(lx, ly, lz)
 
 
 def rho_spat(X, Y, Z, t):
     mu = V*t + d*np.sin(2*np.pi*f*t)
     R = np.exp(- (X**2 + Y**2 + (Z-mu)**2)/(2*sigma**2))
-    denom = np.pi*sigma**2
+    denom = R.sum() * dV
     return R/denom
 
 
@@ -65,8 +69,6 @@ for i, time in enumerate(t):
     rho[i] = rho_spat(xx, yy, zz, time)
     J[i] = J_spat(xx, yy, zz, time)
 
-print(rho.sum(axis=1).sum(axis=1).sum(axis=1))
-
 print("Case 2:", rho.shape, J.shape)
 np.savez("case2.npz", t=t, rho=rho, J=J, x=x, y=y, z=z)
 
@@ -75,8 +77,6 @@ V = 0 #3e-4*speed_of_light
 # tstart, tend = 0.0, 0.2 * lz / V
 f = 2.0/(tend-tstart)
 d = 0.2*lz
-# print(2*np.pi*f*d/speed_of_light)
-# print(tend)
 
 t = np.linspace(tstart, tend, Nt)
 
@@ -85,7 +85,7 @@ def rho_spat(X, Y, Z, t):
     mu = V*t + d*np.sin(2*np.pi*f*t)
     sigma = 0.1 * min(lx, ly, lz)
     R = np.exp(- (X**2 + Y**2 + (Z-mu)**2)/(2*sigma**2))
-    denom = 2*np.pi*sigma**2
+    denom = R.sum() * dV
     return R/denom
 
 
