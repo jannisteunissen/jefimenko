@@ -83,6 +83,14 @@ for k, t in enumerate(t_obs):
         E_obs[i, k, 2] = E_obs[i, k, 2] + dV * factors[i] * \
             np.sum(r_hat[2] * rho_term - Jz_term)
 
+for i, r in enumerate(r_obs):
+    # Converting to spherical co-ords
+    r_sph = norm(r)
+    theta = np.arccos(r[2]/r_sph)
+    phi = np.arctan(r[1]/r[0])
+    print(r, [r_sph, theta, phi])
+
+
 fig, ax = plt.subplots(n_obs_points, sharex=True)
 if not hasattr(ax, 'size'):
     ax = [ax]
@@ -91,6 +99,7 @@ for i, r in enumerate(r_obs):
     ax[i].plot(t_obs, E_obs[i, :, 0], label='Ex')
     ax[i].plot(t_obs, E_obs[i, :, 1], label='Ey')
     ax[i].plot(t_obs, E_obs[i, :, 2], label='Ez')
+    ax[i].plot(t_obs, norm(E_obs[i, :, :], axis=1), label='||E||')
     ax[i].legend()
     ax[i].set_title(f'Observer {i+1} at {r}')
 

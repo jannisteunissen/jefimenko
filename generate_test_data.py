@@ -3,7 +3,7 @@ from scipy.constants import speed_of_light
 
 # Domain dimensions and time arrays
 ndim = 3
-Nt, Nx, Ny, Nz = 100, 23, 20, 25
+Nt, Nx, Ny, Nz = 500, 23, 20, 25
 lx, ly, lz = 1.0, 1.0, 1.0
 x = np.linspace(0, lx, Nx)
 y = np.linspace(0, ly, Ny)
@@ -44,7 +44,7 @@ np.savez_compressed("case1.npz", t=t, rho=np.array(rho), J=np.array(J),
                     x=x, y=y, z=z)
 
 V = 0
-f = 2
+f = 4
 d = 0.2*lz
 
 
@@ -77,6 +77,16 @@ np.savez_compressed("case2.npz", t=t, rho=np.array(rho), J=np.array(J),
 
 # Case 3
 
+# ndim = 3
+# Nt, Nx, Ny, Nz = 200, 50, 50, 50
+# lx, ly, lz = 2.0, 2.0, 2.0
+# x = np.linspace(0, lx, Nx)
+# y = np.linspace(0, ly, Ny)
+# z = np.linspace(0, lz, Nz)
+# xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
+#
+# tstart, tend = 0.0, 1e-8
+# t = np.linspace(tstart, tend, Nt+1)
 
 V = 0.1*speed_of_light
 f = 2
