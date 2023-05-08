@@ -66,7 +66,7 @@ for i, r in enumerate(r_obs):
 
     E_obs.append(np.zeros((n_obs_times, 3)))
 
-    # Re-use norm or r_diff that was already computed
+    # R is |r - r'| for each grid point
     R = delays[i] * speed_of_light
     factor = 1 / (4 * np.pi * epsilon_0 * speed_of_light * R)
     r_hat = r_diff[i] / R
@@ -90,13 +90,6 @@ for i, r in enumerate(r_obs):
             np.sum(factor * (a * r_hat[1] * rho_term - b * Jy_term))
         E_obs[i][k, 2] = E_obs[i][k, 2] + dV * \
             np.sum(factor * (a * r_hat[2] * rho_term - b * Jz_term))
-
-# for i, r in enumerate(r_obs):
-#     # Converting to spherical co-ords
-#     r_sph = norm(r)
-#     theta = np.arccos(r[2]/r_sph)
-#     phi = np.arctan(r[1]/r[0])
-#     print(r, [r_sph, theta, phi])
 
 
 fig, ax = plt.subplots(n_obs_points, sharex=True)
