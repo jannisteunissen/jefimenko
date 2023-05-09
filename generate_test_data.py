@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 ndim = 2
 # Nt, Nx, Ny = 50, 50, 50
 # Nt, Nx, Ny = 100, 17, 17
-Nt, Nx, Ny = 50, 33, 33
+Nt, Nx, Ny = 100, 65, 65
 # Nt, Nx, Ny = 50, 17, 17
 # Nt, Nx, Ny = 50, 9, 9
 
-tstart, tend = 0.0, 1e-6
+tstart, tend = 0.0, 5
 t = np.linspace(tstart, tend, Nt)
 
 lx, ly, lz = 0.2, 0.2, 0.2
@@ -22,18 +22,25 @@ dV = (x[1] - x[0]) * (y[1] - y[0])
 # Case 1
 
 
+q0 = 1.0
+omega = 13.0
+d = 0.5*lz
+sigma = 0.02 * min(lx, ly)
+
+
 def rho_spat(X, Y, t):
-    if t < 0.5*(tstart+tend):
-        return np.zeros(X.shape)
-    else:
-        return np.ones(X.shape)
+    charge = q0*np.cos(omega*t)
+    mu = 0.5*d
+    R_positive = np.exp(- (X**2 + (Y-mu)**2)/(2*sigma**2))
+    R_negative = np.exp(- (X**2 + (Y+mu)**2)/(2*sigma**2))
+    charge_distr = charge*R_positive/(R_positive.sum()*dV)
+    charge_distr -= charge*R_negative/(R_negative.sum()*dV)
+    return charge_distr
 
 
+# To me it feels like the charge is already conserved and thus no current right?
 def J_spat(X, Y, t):
-    if t < 0.5*(tstart+tend):
-        return [np.zeros(X.shape), np.zeros(Y.shape)]
-    else:
-        return [np.ones(X.shape), np.ones(Y.shape)]
+    return [np.zeros(X.shape), np.zeros(Y.shape)]
 
 
 rho = np.zeros((Nt, Nx, Ny))
@@ -46,15 +53,16 @@ print("Case 1:", rho.shape, J.shape)
 np.savez("case1.npz", t=t, rho=rho, J=J, x=x, y=y)
 
 V = 0
-f = 2.0/(tend-tstart)
-d = 0.2*lz
-sigma = 0.2 * min(lx, ly)
+f = 4.0/(tend-tstart)
+d = 0.4*lz
+sigma = 0.05 * min(lx, ly)
 
 
 def rho_spat(X, Y, t):
     mu = V*t + d*np.sin(2*np.pi*f*t)
     R = np.exp(- (X**2 + (Y-mu)**2)/(2*sigma**2))
-    denom = R.sum() * dV
+    #denom = R.sum() * dV
+    denom = 1.0 #1np.pi*sigma**2
     return R/denom
 
 
