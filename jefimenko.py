@@ -54,7 +54,8 @@ for i, r in enumerate(r_obs):
         r_diff[i, dim] = r[dim] - grid_coordinates[dim]
     delays[i] = norm(r_diff[i], axis=0)/speed_of_light
 
-E_obs = []
+E_obs_rho = []
+E_obs_J = []
 coords = grid_coordinates
 coords.insert(0, [])            # Dummy entry for time values
 
@@ -64,7 +65,8 @@ for i, r in enumerate(r_obs):
     t_obs = np.linspace(t.min()+delays[i].max(), t.max()+delays[i].min(),
                         n_obs_times)
 
-    E_obs.append(np.zeros((n_obs_times, 3)))
+    E_obs_rho.append(np.zeros((n_obs_times, 3)))
+    E_obs_J.append(np.zeros((n_obs_times, 3)))
 
     # R is |r - r'| for each grid point
     R = delays[i] * speed_of_light
@@ -78,30 +80,36 @@ for i, r in enumerate(r_obs):
 
         # Interpolate at every grid point at the given t_source
         rho_term = drho_dt(coords_tuple)
-        Jx_term = dJx_dt(coords_tuple) / speed_of_light
-        Jy_term = dJy_dt(coords_tuple) / speed_of_light
-        Jz_term = dJz_dt(coords_tuple) / speed_of_light
-        a = 1
-        b = 1
+        J_term = np.array([dJx_dt(coords_tuple), dJy_dt(coords_tuple),
+                           dJz_dt(coords_tuple)]) / speed_of_light
 
-        E_obs[i][k, 0] = E_obs[i][k, 0] + dV * \
-            np.sum(factor * (a * r_hat[0] * rho_term - b * Jx_term))
-        E_obs[i][k, 1] = E_obs[i][k, 1] + dV * \
-            np.sum(factor * (a * r_hat[1] * rho_term - b * Jy_term))
-        E_obs[i][k, 2] = E_obs[i][k, 2] + dV * \
-            np.sum(factor * (a * r_hat[2] * rho_term - b * Jz_term))
+        for dim in range(3):
+            E_obs_rho[i][k, dim] = E_obs_rho[i][k, dim] + dV * \
+                np.sum(factor * r_hat[dim] * rho_term)
+            E_obs_J[i][k, dim] = E_obs_J[i][k, dim] - dV * \
+                np.sum(factor * J_term[dim])
 
-
-fig, ax = plt.subplots(n_obs_points, sharex=True)
-if not hasattr(ax, 'size'):
-    ax = [ax]
+fig, ax = plt.subplots(n_obs_points, 3, sharex=True, sharey=True)
 
 for i, r in enumerate(r_obs):
-    ax[i].plot(t_obs, E_obs[i][:, 0], label='Ex')
-    ax[i].plot(t_obs, E_obs[i][:, 1], label='Ey')
-    ax[i].plot(t_obs, E_obs[i][:, 2], label='Ez')
-    ax[i].plot(t_obs, norm(E_obs[i][:, :], axis=1), '--', label='||E||')
-    ax[i].legend()
-    ax[i].set_title(f'Observer {i+1} at {r}')
+    ax[i, 0].plot(t_obs, E_obs_rho[i][:, 0], label='Ex')
+    ax[i, 0].plot(t_obs, E_obs_rho[i][:, 1], label='Ey')
+    ax[i, 0].plot(t_obs, E_obs_rho[i][:, 2], label='Ez')
+    ax[i, 0].legend()
+    ax[i, 0].set_title(f'Observer {i+1} at {r} (rho)')
+
+    ax[i, 1].plot(t_obs, E_obs_J[i][:, 0], label='Ex')
+    ax[i, 1].plot(t_obs, E_obs_J[i][:, 1], label='Ey')
+    ax[i, 1].plot(t_obs, E_obs_J[i][:, 2], label='Ez')
+    ax[i, 1].legend()
+    ax[i, 1].set_title(f'Observer {i+1} at {r} (J)')
+
+    ax[i, 2].plot(t_obs, E_obs_rho[i][:, 0] + E_obs_J[i][:, 0], label='Ex')
+    ax[i, 2].plot(t_obs, E_obs_rho[i][:, 1] + E_obs_J[i][:, 1], label='Ey')
+    ax[i, 2].plot(t_obs, E_obs_rho[i][:, 2] + E_obs_J[i][:, 2], label='Ez')
+    ax[i, 2].plot(t_obs, norm(E_obs_rho[i] + E_obs_J[i], axis=1),
+                  '--', label='||E||')
+    ax[i, 2].legend()
+    ax[i, 2].set_title(f'Observer {i+1} at {r} (total)')
 
 plt.show()

@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.constants import speed_of_light
 import matplotlib.pyplot as plt
+from scipy.interpolate import griddata
 
 # Domain dimensions and time arrays
 ndim = 3
-# Nt, Nx, Ny, Nz = 50, 50, 50, 50
+# Nt, Nx, Ny, Nz = 50, 51, 51, 51
 # Nt, Nx, Ny, Nz = 100, 17, 17, 17
 Nt, Nx, Ny, Nz = 50, 33, 33, 33
 # Nt, Nx, Ny, Nz = 50, 17, 17, 17
@@ -18,29 +19,41 @@ x = np.linspace(-lx/2, lx/2, Nx)
 y = np.linspace(-ly/2, ly/2, Ny)
 z = np.linspace(-lz/2, lz/2, Nz)
 xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
-dV = (x[1] - x[0]) * (y[1] - y[0]) * (z[1] - z[0])
+dx, dy, dz = x[1] - x[0], y[1] - y[0], z[1] - z[0]
+dV = dx * dy * dz
 
 # Case 1
 q0 = 1.0
-omega = 0.001
+omega = 2 * (2*np.pi/tend)
 d = 0.5*lz
-sigma = 0.01 * min(lx, ly)
+sigma = 0.05 * min(lx, ly)
+mu = 0.5*d
 
 
 def rho_spat(X, Y, Z, t):
     charge = q0*np.cos(omega*t)
-    mu = 0.5*d
-    R_positive = np.exp(- (X**2 + Y**2 + (Z-mu)**2)/(2*sigma**2))
-    R_negative = np.exp(- (X**2 + Y**2 + (Z+mu)**2)/(2*sigma**2))
-    charge_distr = charge*R_positive/(R_positive.sum()*dV)
-    charge_distr -= charge*R_negative/(R_negative.sum()*dV)
+    # R_positive = np.exp(- (X**2 + Y**2 + (Z-mu)**2)/(2*sigma**2))
+    # R_negative = np.exp(- (X**2 + Y**2 + (Z+mu)**2)/(2*sigma**2))
+    # charge_distr = charge*R_positive/(R_positive.sum()*dV)
+    # charge_distr -= charge*R_negative/(R_negative.sum()*dV)
+    charge_distr = np.zeros_like(X)
+    zlo = Nz//4+1
+    zhi = (3*Nz)//4+1
+    charge_distr[Nx//2+1, Ny//2+1, zlo] = -charge/dV
+    charge_distr[Nx//2+1, Ny//2+1, zhi] = +charge/dV
     return charge_distr
 
 
-# To me it feels like the charge is already conserved and 
-# thus no current right?
 def J_spat(X, Y, Z, t):
-    return [np.zeros(X.shape), np.zeros(Y.shape), np.zeros(Z.shape)]
+    II = -q0*omega*np.sin(omega*t)
+    J = II / (dx * dy)
+    J_spat = np.zeros((3, *X.shape))
+    zlo = Nz//4+1
+    zhi = (3*Nz)//4+1
+    J_spat[2, Nx//2+1, Ny//2+1, zlo:zhi+1] = J
+    J_spat[2, Nx//2+1, Ny//2+1, zlo] = 0.5*J
+    J_spat[2, Nx//2+1, Ny//2+1, zhi] = 0.5*J
+    return J_spat
 
 
 rho = np.zeros((Nt, Nx, Ny, Nz))
