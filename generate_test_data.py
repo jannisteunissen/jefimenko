@@ -22,6 +22,7 @@ xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
 dx, dy, dz = x[1] - x[0], y[1] - y[0], z[1] - z[0]
 dV = dx * dy * dz
 
+
 # Case 1
 q0 = 1.0
 omega = 2 * (2*np.pi/tend)
@@ -124,3 +125,57 @@ for i, time in enumerate(t):
 
 print("Case 3:", rho.shape, J.shape)
 np.savez("case3.npz", t=t, rho=rho, J=J, x=x, y=y, z=z)
+
+
+# Case 4
+def particleToGrid(particle_pos):
+    zz = np.zeros_like(xx)
+    xp, yp, zp = particle_pos
+    # Converting to unit co-ordinates
+    ix = (xp - x[0])/dx
+    l = ix - int(ix)
+    iy = (yp - y[0])/dy
+    m = iy - int(iy)
+    iz = (zp - z[0])/dz
+    n = iz - int(iz)
+    neighbors = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
+                 [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]]
+    nearest_indices = [[i+int(ix), j+int(iy), k+int(iz)]
+                       for i, j, k in neighbors]
+    # Areas = np.array([(1-l)*(1-m), l*(1-m), (1-l)*m, l*m])/(dx*dy)
+    Areas = np.array([(1-l)*(1-m)*(1-n), l*(1-m)*(1-n), (1-l)*m*(1-n), l*m*(1-n),
+                      (1-l)*(1-m)*n, l*(1-m)*n, (1-l)*m*n, l*m*n])
+    print(Areas, Areas.sum())
+    for area_idx, idx in enumerate(nearest_indices):
+        zz[idx[0], idx[1]] = Areas[area_idx]
+    return zz
+
+V = 0 #3e-4*speed_of_light
+# tstart, tend = 0.0, 0.2 * lz / V
+f = 2.0/(tend-tstart)
+d = 0.2*lz
+
+t = np.linspace(tstart, tend, Nt)
+
+
+def rho_spat(X, Y, Z, t):
+    xpos, ypos, zpos = 0, 0, V*t + d*np.sin(2*np.pi*f*t)
+
+    # denom = R.sum() * dV
+    return particleToGrid([xpos, ypos, zpos])
+
+
+def J_spat(X, Y, Z, t):
+    rho = rho_spat(X, Y, Z, t)
+    II = (V + 2*np.pi*f*d*np.cos(2*np.pi*f*t))/(dV)
+    return particleToGrid([0.0, 0.0, II])
+
+
+rho = np.zeros((Nt, Nx, Ny, Nz))
+J = np.zeros((Nt, ndim, Nx, Ny, Nz))
+for i, time in enumerate(t):
+    rho[i] = rho_spat(xx, yy, zz, time)
+    J[i] = J_spat(xx, yy, zz, time)
+
+print("Case 4:", rho.shape, J.shape)
+np.savez("case4.npz", t=t, rho=rho, J=J, x=x, y=y, z=z)
