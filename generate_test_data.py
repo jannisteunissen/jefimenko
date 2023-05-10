@@ -21,18 +21,26 @@ xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
 dV = (x[1] - x[0]) * (y[1] - y[0]) * (z[1] - z[0])
 
 # Case 1
+q0 = 1.0
+omega = 0.001
+d = 0.5*lz
+sigma = 0.01 * min(lx, ly)
+
+
 def rho_spat(X, Y, Z, t):
-    if t < 0.5*(tstart+tend):
-        return np.zeros(X.shape)
-    else:
-        return np.ones(X.shape)
+    charge = q0*np.cos(omega*t)
+    mu = 0.5*d
+    R_positive = np.exp(- (X**2 + Y**2 + (Z-mu)**2)/(2*sigma**2))
+    R_negative = np.exp(- (X**2 + Y**2 + (Z+mu)**2)/(2*sigma**2))
+    charge_distr = charge*R_positive/(R_positive.sum()*dV)
+    charge_distr -= charge*R_negative/(R_negative.sum()*dV)
+    return charge_distr
 
 
+# To me it feels like the charge is already conserved and 
+# thus no current right?
 def J_spat(X, Y, Z, t):
-    if t < 0.5*(tstart+tend):
-        return [np.zeros(X.shape), np.zeros(Y.shape), np.zeros(Z.shape)]
-    else:
-        return [np.ones(X.shape), np.ones(Y.shape), np.ones(Z.shape)]
+    return [np.zeros(X.shape), np.zeros(Y.shape), np.zeros(Z.shape)]
 
 
 rho = np.zeros((Nt, Nx, Ny, Nz))
