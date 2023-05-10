@@ -23,23 +23,36 @@ t = npz_file['t']
 x, y, z = npz_file['x'], npz_file['y'], npz_file['z']
 rho_samples = npz_file['rho']
 J_samples = npz_file['J']
+
 # Assume constant dx
 dx = np.array([x[1] - x[0], y[1] - y[0], z[1] - z[0]])
+dV = np.product(dx)
 grid_size = rho_samples.shape[1:]
 grid_coordinates = np.meshgrid(x, y, z, indexing='ij', sparse=True)
 
-rho_deriv = np.gradient(rho_samples, t, axis=0)
-J_deriv = np.gradient(J_samples, t, axis=0)
-Jx_deriv, Jy_deriv, Jz_deriv = J_deriv[:, 0], J_deriv[:, 1], J_deriv[:, 2]
+# Take time derivatives at center of time intervals. They are second order
+# accurate, and as local as possible (compared to e.g. central differencing)
+N_t = len(t) - 1
+t_deriv = 0.5 * (t[:-1] + t[1:])
+rho_deriv = np.zeros((N_t, *grid_size))
+J_deriv = np.zeros((N_t, 3, *grid_size))
+
+for i in range(len(t) - 1):
+    inv_dt = 1/(t[i+1] - t[i])
+    rho_deriv[i] = (rho_samples[i+1] - rho_samples[i]) * inv_dt
+    J_deriv[i] = (J_samples[i+1] - J_samples[i]) * inv_dt
 
 # RegularGridInterpolator is a bit overkill, since we do not interpolate in
 # space, but the only way to vectorize time interpolation
-drho_dt = RegularGridInterpolator((t, x, y, z), rho_deriv, bounds_error=False)
-dJx_dt = RegularGridInterpolator((t, x, y, z), Jx_deriv, bounds_error=False)
-dJy_dt = RegularGridInterpolator((t, x, y, z), Jy_deriv, bounds_error=False)
-dJz_dt = RegularGridInterpolator((t, x, y, z), Jz_deriv, bounds_error=False)
+drho_dt = RegularGridInterpolator((t_deriv, x, y, z), rho_deriv,
+                                  bounds_error=False)
+dJx_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 0],
+                                 bounds_error=False)
+dJy_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 1],
+                                 bounds_error=False)
+dJz_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 2],
+                                 bounds_error=False)
 
-dV = np.product(dx)
 r_obs = np.reshape(args.observation_points, [-1, 3])
 n_obs_points = len(r_obs)
 
@@ -62,7 +75,8 @@ coords.insert(0, [])            # Dummy entry for time values
 for i, r in enumerate(r_obs):
     # Observation time range
     n_obs_times = len(t)            # TODO: have more options
-    t_obs = np.linspace(t.min()+delays[i].max(), t.max()+delays[i].min(),
+    t_obs = np.linspace(t_deriv.min()+delays[i].max(),
+                        t_deriv.max()+delays[i].min(),
                         n_obs_times)
 
     E_obs_rho.append(np.zeros((n_obs_times, 3)))
@@ -84,12 +98,15 @@ for i, r in enumerate(r_obs):
                            dJz_dt(coords_tuple)]) / speed_of_light
 
         for dim in range(3):
-            E_obs_rho[i][k, dim] = E_obs_rho[i][k, dim] + dV * \
-                np.sum(factor * r_hat[dim] * rho_term)
-            E_obs_J[i][k, dim] = E_obs_J[i][k, dim] - dV * \
-                np.sum(factor * J_term[dim])
+            E_obs_rho[i][k, dim] += dV * np.sum(factor * r_hat[dim] * rho_term)
+            E_obs_J[i][k, dim] -= dV * np.sum(factor * J_term[dim])
+
+        # print(t_o, E_obs_rho[i][k, 2], rho_term.min(), rho_term.max(),
+        #       rho_term.mean(), coords[0].min(), coords[0].max())
 
 fig, ax = plt.subplots(n_obs_points, 3, sharex=True, sharey=True)
+if ax.ndim == 1:
+    ax = ax[None, :]
 
 for i, r in enumerate(r_obs):
     ax[i, 0].plot(t_obs, E_obs_rho[i][:, 0], label='Ex')

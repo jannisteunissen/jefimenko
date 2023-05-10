@@ -6,9 +6,9 @@ from scipy.interpolate import griddata
 # Domain dimensions and time arrays
 ndim = 3
 # Nt, Nx, Ny, Nz = 50, 51, 51, 51
-# Nt, Nx, Ny, Nz = 100, 17, 17, 17
-Nt, Nx, Ny, Nz = 50, 33, 33, 33
 # Nt, Nx, Ny, Nz = 50, 17, 17, 17
+Nt, Nx, Ny, Nz = 50, 33, 33, 33
+# Nt, Nx, Ny, Nz = 200, 9, 9, 9
 # Nt, Nx, Ny, Nz = 50, 9, 9, 9
 
 tstart, tend = 0.0, 1e-6
@@ -128,47 +128,50 @@ np.savez("case3.npz", t=t, rho=rho, J=J, x=x, y=y, z=z)
 
 
 # Case 4
-def particleToGrid(particle_pos):
-    zz = np.zeros_like(xx)
-    xp, yp, zp = particle_pos
-    # Converting to unit co-ordinates
-    ix = (xp - x[0])/dx
-    l = ix - int(ix)
-    iy = (yp - y[0])/dy
-    m = iy - int(iy)
-    iz = (zp - z[0])/dz
-    n = iz - int(iz)
-    neighbors = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
-                 [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]]
-    nearest_indices = [[i+int(ix), j+int(iy), k+int(iz)]
-                       for i, j, k in neighbors]
-    # Areas = np.array([(1-l)*(1-m), l*(1-m), (1-l)*m, l*m])/(dx*dy)
-    Areas = np.array([(1-l)*(1-m)*(1-n), l*(1-m)*(1-n), (1-l)*m*(1-n), l*m*(1-n),
-                      (1-l)*(1-m)*n, l*(1-m)*n, (1-l)*m*n, l*m*n])
-    print(Areas, Areas.sum())
+def particleToGrid(r, w):
+    rho = np.zeros_like(xx)
+    inv_dr = 1/np.array([dx, dy, dz])
+    r0 = np.array([x[0], y[0], z[0]])
+
+    tmp = (r - r0) * inv_dr
+    l, m, n = tmp - np.floor(tmp)
+    ix_lo = np.floor(tmp).astype(int)
+
+    neighbors = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
+                          [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]])
+    nearest_indices = neighbors + ix_lo
+
+    weights = np.array([(1-l)*(1-m)*(1-n), l*(1-m)*(1-n), (1-l)*m*(1-n),
+                        l*m*(1-n), (1-l)*(1-m)*n, l*(1-m)*n, (1-l)*m*n, l*m*n])
+
     for area_idx, idx in enumerate(nearest_indices):
-        zz[idx[0], idx[1]] = Areas[area_idx]
-    return zz
+        rho[idx[0], idx[1], idx[2]] = w * weights[area_idx] / dV
+
+    return rho
+
 
 V = 0 #3e-4*speed_of_light
 # tstart, tend = 0.0, 0.2 * lz / V
 f = 2.0/(tend-tstart)
 d = 0.2*lz
 
-t = np.linspace(tstart, tend, Nt)
+# t = np.linspace(tstart, tend, Nt)
 
 
 def rho_spat(X, Y, Z, t):
     xpos, ypos, zpos = 0, 0, V*t + d*np.sin(2*np.pi*f*t)
-
-    # denom = R.sum() * dV
-    return particleToGrid([xpos, ypos, zpos])
+    rho = particleToGrid([xpos, ypos, zpos], 1.0)
+    # plt.plot(rho[Nx//2, Ny//2, :])
+    # plt.show()
+    return rho
 
 
 def J_spat(X, Y, Z, t):
-    rho = rho_spat(X, Y, Z, t)
-    II = (V + 2*np.pi*f*d*np.cos(2*np.pi*f*t))/(dV)
-    return particleToGrid([0.0, 0.0, II])
+    xpos, ypos, zpos = 0, 0, V*t + d*np.sin(2*np.pi*f*t)
+    zvelocity = V + 2*np.pi*f*d*np.cos(2*np.pi*f*t)
+    J = [np.zeros_like(X), np.zeros_like(X),
+         particleToGrid([xpos, ypos, zpos], zvelocity)]
+    return J
 
 
 rho = np.zeros((Nt, Nx, Ny, Nz))
