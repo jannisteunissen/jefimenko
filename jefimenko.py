@@ -116,6 +116,7 @@ if ax.ndim == 1:
     ax = ax[None, :]
 
 for i, r in enumerate(r_obs):
+    t_obs = t_obs_array[i]
     ax[i, 0].plot(t_obs, E_obs_rho[i][:, 0], label='Ex')
     ax[i, 0].plot(t_obs, E_obs_rho[i][:, 1], label='Ey')
     ax[i, 0].plot(t_obs, E_obs_rho[i][:, 2], label='Ez')
