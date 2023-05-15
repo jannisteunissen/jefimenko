@@ -4,6 +4,7 @@ import numpy as np
 from numpy.linalg import norm
 import matplotlib.pyplot as plt
 import argparse
+from tqdm import tqdm
 from scipy.interpolate import RegularGridInterpolator
 from scipy.constants import speed_of_light, epsilon_0
 
@@ -45,13 +46,13 @@ for i in range(len(t) - 1):
 # RegularGridInterpolator is a bit overkill, since we do not interpolate in
 # space, but the only way to vectorize time interpolation
 drho_dt = RegularGridInterpolator((t_deriv, x, y, z), rho_deriv,
-                                  bounds_error=False)
+                                  bounds_error=False, fill_value=0.)
 dJx_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 0],
-                                 bounds_error=False)
+                                 bounds_error=False, fill_value=0.)
 dJy_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 1],
-                                 bounds_error=False)
+                                 bounds_error=False, fill_value=0.)
 dJz_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 2],
-                                 bounds_error=False)
+                                 bounds_error=False, fill_value=0.)
 
 r_obs = np.reshape(args.observation_points, [-1, 3])
 n_obs_points = len(r_obs)
@@ -69,15 +70,24 @@ for i, r in enumerate(r_obs):
 
 E_obs_rho = []
 E_obs_J = []
+t_obs_array = []
 coords = grid_coordinates
 coords.insert(0, [])            # Dummy entry for time values
 
 for i, r in enumerate(r_obs):
     # Observation time range
-    n_obs_times = len(t)            # TODO: have more options
-    t_obs = np.linspace(t_deriv.min()+delays[i].max(),
-                        t_deriv.max()+delays[i].min(),
-                        n_obs_times)
+    t_obs_min = t_deriv.min()+delays[i].max()
+    t_obs_max = t_deriv.max()+delays[i].min()
+
+    # TODO: have more options
+    dt_source = (t.max() - t.min()) / (len(t) - 1)
+    n_obs_times = np.ceil((t_obs_max-t_obs_min)/dt_source).astype(int)
+
+    if n_obs_times < 0.1 * len(t):
+        raise ValueError("Not enough observation time")
+
+    t_obs = np.linspace(t_obs_min, t_obs_max, n_obs_times)
+    t_obs_array.append(t_obs)
 
     E_obs_rho.append(np.zeros((n_obs_times, 3)))
     E_obs_J.append(np.zeros((n_obs_times, 3)))
@@ -87,7 +97,7 @@ for i, r in enumerate(r_obs):
     factor = 1 / (4 * np.pi * epsilon_0 * speed_of_light * R)
     r_hat = r_diff[i] / R
 
-    for k, t_o in enumerate(t_obs):
+    for k, t_o in enumerate(tqdm(t_obs)):
         # Time at source
         coords[0] = t_o - delays[i]
         coords_tuple = tuple(coords)
@@ -101,10 +111,7 @@ for i, r in enumerate(r_obs):
             E_obs_rho[i][k, dim] += dV * np.sum(factor * r_hat[dim] * rho_term)
             E_obs_J[i][k, dim] -= dV * np.sum(factor * J_term[dim])
 
-        # print(t_o, E_obs_rho[i][k, 2], rho_term.min(), rho_term.max(),
-        #       rho_term.mean(), coords[0].min(), coords[0].max())
-
-fig, ax = plt.subplots(n_obs_points, 3, sharex=True, sharey=True)
+fig, ax = plt.subplots(n_obs_points, 3, sharex='row', sharey=True)
 if ax.ndim == 1:
     ax = ax[None, :]
 
