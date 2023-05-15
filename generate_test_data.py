@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 from scipy.constants import speed_of_light
 import matplotlib.pyplot as plt
@@ -7,8 +9,9 @@ from scipy.interpolate import griddata
 ndim = 3
 # Nt, Nx, Ny, Nz = 50, 51, 51, 51
 # Nt, Nx, Ny, Nz = 50, 17, 17, 17
-Nt, Nx, Ny, Nz = 50, 33, 33, 33
-# Nt, Nx, Ny, Nz = 200, 9, 9, 9
+Nt, Nx, Ny, Nz = 91, 25, 25, 25
+# Nt, Nx, Ny, Nz = 50, 65, 65, 65
+# Nt, Nx, Ny, Nz = 400, 9, 9, 9
 # Nt, Nx, Ny, Nz = 50, 9, 9, 9
 
 tstart, tend = 0.0, 1e-6
@@ -95,17 +98,16 @@ print("Case 2:", rho.shape, J.shape)
 np.savez("case2.npz", t=t, rho=rho, J=J, x=x, y=y, z=z)
 
 # Case 3
-V = 0 #3e-4*speed_of_light
-# tstart, tend = 0.0, 0.2 * lz / V
-f = 2.0/(tend-tstart)
-d = 0.2*lz
-
+V = 0.3*speed_of_light
+tstart, tend = 0.0, 0.5 * lz / V
 t = np.linspace(tstart, tend, Nt)
+f = 2.0/(tend-tstart)
+d = 0.5 * V / (2 * np.pi * f)
+sigma = 0.1 * min(lx, ly, lz)
 
 
 def rho_spat(X, Y, Z, t):
-    mu = V*t + d*np.sin(2*np.pi*f*t)
-    sigma = 0.1 * min(lx, ly, lz)
+    mu = -0.25 * lz + V*t + d*np.sin(2*np.pi*f*t)
     R = np.exp(- (X**2 + Y**2 + (Z-mu)**2)/(2*sigma**2))
     denom = R.sum() * dV
     return R/denom
@@ -150,19 +152,16 @@ def particleToGrid(r, w):
     return rho
 
 
-V = 0 #3e-4*speed_of_light
-# tstart, tend = 0.0, 0.2 * lz / V
+V = 0.1*speed_of_light
+tstart, tend = 0.0, 0.2 * lz / V
+t = np.linspace(tstart, tend, Nt)
 f = 2.0/(tend-tstart)
-d = 0.2*lz
-
-# t = np.linspace(tstart, tend, Nt)
+d = 0.5 * V / (2 * np.pi * f)
 
 
 def rho_spat(X, Y, Z, t):
     xpos, ypos, zpos = 0, 0, V*t + d*np.sin(2*np.pi*f*t)
     rho = particleToGrid([xpos, ypos, zpos], 1.0)
-    # plt.plot(rho[Nx//2, Ny//2, :])
-    # plt.show()
     return rho
 
 
