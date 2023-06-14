@@ -19,6 +19,7 @@ p.add_argument('-observation_points', type=float, nargs='+', required=True,
                help='N*3 coordinates of outside observation points')
 args = p.parse_args()
 
+file_pref = args.npz.split(".")[0]
 npz_file = np.load(args.npz)
 t = npz_file['t']
 x, y, z = npz_file['x'], npz_file['y'], npz_file['z']
@@ -136,5 +137,11 @@ for i, r in enumerate(r_obs):
                   '--', label='||E||')
     ax[i, 2].legend()
     ax[i, 2].set_title(f'Observer {i+1} at {r} (total)')
+    head = "time E_rho_x E_rho_y E_rho_z E_J_x E_J_y E_J_z"
+    np.savetxt(file_pref+f"_point{i}.txt",
+               np.array([t_obs, E_obs_rho[i][:, 0],
+                E_obs_rho[i][:, 1], E_obs_rho[i][:, 2],
+                E_obs_J[i][:, 0], E_obs_J[i][:, 1],
+                E_obs_J[i][:, 2]]).T, header=head, fmt="%.4e")
 
 plt.show()
