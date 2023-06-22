@@ -7,6 +7,7 @@ import argparse
 from tqdm import tqdm
 from scipy.interpolate import RegularGridInterpolator
 from scipy.constants import speed_of_light, epsilon_0
+from os.path import splitext
 
 p = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -19,7 +20,7 @@ p.add_argument('-observation_points', type=float, nargs='+', required=True,
                help='N*3 coordinates of outside observation points')
 args = p.parse_args()
 
-file_pref = args.npz.split(".")[0]
+file_prefix = splitext(args.npz)[0]
 npz_file = np.load(args.npz)
 t = npz_file['t']
 x, y, z = npz_file['x'], npz_file['y'], npz_file['z']
@@ -44,16 +45,13 @@ for i in range(len(t) - 1):
     rho_deriv[i] = (rho_samples[i+1] - rho_samples[i]) * inv_dt
     J_deriv[i] = (J_samples[i+1] - J_samples[i]) * inv_dt
 
+
 # RegularGridInterpolator is a bit overkill, since we do not interpolate in
 # space, but the only way to vectorize time interpolation
-drho_dt = RegularGridInterpolator((t_deriv, x, y, z), rho_deriv,
-                                  bounds_error=False, fill_value=0.)
-dJx_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 0],
-                                 bounds_error=False, fill_value=0.)
-dJy_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 1],
-                                 bounds_error=False, fill_value=0.)
-dJz_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 2],
-                                 bounds_error=False, fill_value=0.)
+drho_dt = RegularGridInterpolator((t_deriv, x, y, z), rho_deriv)
+dJx_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 0])
+dJy_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 1])
+dJz_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 2])
 
 r_obs = np.reshape(args.observation_points, [-1, 3])
 n_obs_points = len(r_obs)
@@ -77,10 +75,11 @@ coords.insert(0, [])            # Dummy entry for time values
 
 for i, r in enumerate(r_obs):
     # Observation time range
-    t_obs_min = t_deriv.min()+delays[i].max()
-    t_obs_max = t_deriv.max()+delays[i].min()
+    small_time = 1e-5 * (t_deriv[1] - t_deriv[0])
+    t_obs_min = t_deriv.min() + delays[i].max() + small_time
+    t_obs_max = t_deriv.max() + delays[i].min() - small_time
 
-    # TODO: have more options
+    # Use same time step as input data
     dt_source = (t.max() - t.min()) / (len(t) - 1)
     n_obs_times = np.ceil((t_obs_max-t_obs_min)/dt_source).astype(int)
 
@@ -137,11 +136,12 @@ for i, r in enumerate(r_obs):
                   '--', label='||E||')
     ax[i, 2].legend()
     ax[i, 2].set_title(f'Observer {i+1} at {r} (total)')
+
     head = "time E_rho_x E_rho_y E_rho_z E_J_x E_J_y E_J_z"
-    np.savetxt(file_pref+f"_point{i}.txt",
+    np.savetxt(file_prefix + f"_point{i}.txt",
                np.array([t_obs, E_obs_rho[i][:, 0],
-                E_obs_rho[i][:, 1], E_obs_rho[i][:, 2],
-                E_obs_J[i][:, 0], E_obs_J[i][:, 1],
-                E_obs_J[i][:, 2]]).T, header=head, fmt="%.4e")
+                         E_obs_rho[i][:, 1], E_obs_rho[i][:, 2],
+                         E_obs_J[i][:, 0], E_obs_J[i][:, 1],
+                         E_obs_J[i][:, 2]]).T, header=head, fmt="%.4e")
 
 plt.show()
