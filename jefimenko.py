@@ -12,7 +12,7 @@ from os.path import splitext
 p = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     description='Numerical solution to Jefimenko equations')
-p.add_argument('-npz', type=str, required=True,
+p.add_argument('npz', type=str,
                help='''Numpy file with 4D charge density scalar rho(t,x,y,z),
                5D current density vector J(t,dim,x,y,z), time array t and
                grid coordinate arrays x, y, z''')
@@ -111,6 +111,17 @@ for i, r in enumerate(r_obs):
             E_obs_rho[i][k, dim] += dV * np.sum(factor * r_hat[dim] * rho_term)
             E_obs_J[i][k, dim] -= dV * np.sum(factor * J_term[dim])
 
+    # Save to text file
+    header = 'time E_rho_x E_rho_y E_rho_z E_J_x E_J_y E_J_z'
+    fname = file_prefix + f'_observer_{r[0]}_{r[1]}_{r[2]}.txt'
+    np.savetxt(fname,
+               np.array([t_obs, E_obs_rho[i][:, 0],
+                         E_obs_rho[i][:, 1], E_obs_rho[i][:, 2],
+                         E_obs_J[i][:, 0], E_obs_J[i][:, 1],
+                         E_obs_J[i][:, 2]]).T, header=header)
+    print(f'Wrote {fname}')
+
+
 fig, ax = plt.subplots(n_obs_points, 3, sharex='row', sharey=True)
 if ax.ndim == 1:
     ax = ax[None, :]
@@ -132,16 +143,7 @@ for i, r in enumerate(r_obs):
     ax[i, 2].plot(t_obs, E_obs_rho[i][:, 0] + E_obs_J[i][:, 0], label='Ex')
     ax[i, 2].plot(t_obs, E_obs_rho[i][:, 1] + E_obs_J[i][:, 1], label='Ey')
     ax[i, 2].plot(t_obs, E_obs_rho[i][:, 2] + E_obs_J[i][:, 2], label='Ez')
-    ax[i, 2].plot(t_obs, norm(E_obs_rho[i] + E_obs_J[i], axis=1),
-                  '--', label='||E||')
     ax[i, 2].legend()
     ax[i, 2].set_title(f'Observer {i+1} at {r} (total)')
-
-    head = "time E_rho_x E_rho_y E_rho_z E_J_x E_J_y E_J_z"
-    np.savetxt(file_prefix + f"_point{i}.txt",
-               np.array([t_obs, E_obs_rho[i][:, 0],
-                         E_obs_rho[i][:, 1], E_obs_rho[i][:, 2],
-                         E_obs_J[i][:, 0], E_obs_J[i][:, 1],
-                         E_obs_J[i][:, 2]]).T, header=head, fmt="%.4e")
 
 plt.show()
