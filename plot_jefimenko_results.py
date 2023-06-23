@@ -28,7 +28,7 @@ def custom_filter(x):
 
 
 N = len(args.data_files)
-fig, ax = plt.subplots(N, 3, sharex='row', sharey=True)
+fig, ax = plt.subplots(N, 3, sharex='row', sharey=True, figsize=(8, N*3))
 fig2, ax2 = plt.subplots(N, sharex=True, sharey=True)
 
 if N == 1:
@@ -52,16 +52,11 @@ for i, f in enumerate(args.data_files):
     ax[i, 0].plot(t_obs, custom_filter(E_obs_rho[:, 2]), label='Ez')
     tmp = savgol_filter(E_obs_rho[:, 2], 13, 1)
     ax[i, 0].legend()
-    ax[i, 0].set_title('rho')
-    ax[i, 0].set_xlabel('t (s)')
     ax[i, 0].set_ylabel('E (V/m)')
 
     ax[i, 1].plot(t_obs, custom_filter(E_obs_J[:, 0]), label='Ex')
     ax[i, 1].plot(t_obs, custom_filter(E_obs_J[:, 1]), label='Ey')
     ax[i, 1].plot(t_obs, custom_filter(E_obs_J[:, 2]), label='Ez')
-    ax[i, 1].legend()
-    ax[i, 1].set_title('J')
-    ax[i, 1].set_xlabel('t (s)')
 
     ax[i, 2].plot(t_obs, custom_filter(E_obs_rho[:, 0] + E_obs_J[:, 0]),
                   label='Ex')
@@ -69,9 +64,11 @@ for i, f in enumerate(args.data_files):
                   label='Ey')
     ax[i, 2].plot(t_obs, custom_filter(E_obs_rho[:, 2] + E_obs_J[:, 2]),
                   label='Ez')
-    ax[i, 2].legend()
-    ax[i, 2].set_title(f'total')
-    ax[i, 2].set_xlabel('t (s)')
+
+    ax[i, 2].text(1.1, 0.5, r'$r_\mathrm{obs}$ = ' + r,
+                  rotation='vertical',
+                  horizontalalignment='center',
+                  verticalalignment='center', transform=ax[i, 2].transAxes)
 
     # Power spectrum
     freq, Pxx_den = welch(custom_filter(E_obs_rho[:, 2]),
@@ -80,6 +77,17 @@ for i, f in enumerate(args.data_files):
     ax2[i].set_xlabel('Frequency (MHz)')
     ax2[i].set_ylabel('PSD [V**2/Hz]')
     ax2[i].set_title(f'Observer {i} at {r}')
+
+# Set labels only for certain plots
+ax[0, 0].set_title(r'$\partial_t \rho$ term')
+ax[0, 1].set_title(r'$\partial_t \vec{J}$ term')
+ax[0, 2].set_title(f'total')
+
+ax[-1, 0].set_xlabel('t (s)')
+ax[-1, 1].set_xlabel('t (s)')
+ax[-1, 2].set_xlabel('t (s)')
+
+
 
 plt.tight_layout()
 plt.show()
