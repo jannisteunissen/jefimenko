@@ -84,7 +84,7 @@ for i, r in enumerate(r_obs):
     n_obs_times = np.ceil((t_obs_max-t_obs_min)/dt_source).astype(int)
 
     if n_obs_times < 0.1 * len(t):
-        raise ValueError("Not enough observation time")
+        raise ValueError(f"Not enough observation time for point {r}")
 
     t_obs = np.linspace(t_obs_min, t_obs_max, n_obs_times)
     t_obs_array.append(t_obs)
