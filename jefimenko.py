@@ -41,18 +41,26 @@ rho_samples = npz_file['rho']
 J_samples = npz_file['J']
 grid_size = rho_samples.shape[1:]
 
-# Compute time derivative and change original arrays to save memory
-for i in range(N_t-1):
+# One large array for derivatives
+ddt_samples = np.zeros((N_t, *grid_size, 4))
+
+# Compute time derivative
+for i in range(N_t):
     inv_dt = 1/(t[i+1] - t[i])
-    rho_samples[i] = (rho_samples[i+1] - rho_samples[i]) * inv_dt
-    J_samples[i] = (J_samples[i+1] - J_samples[i]) * inv_dt
+    ddt_samples[i, :, :, :, 0] = (rho_samples[i+1] - rho_samples[i]) * inv_dt
+
+    # Re-order J array
+    tmp = (J_samples[i+1] - J_samples[i]) * inv_dt
+    ddt_samples[i, :, :, :, 1] = tmp[0]
+    ddt_samples[i, :, :, :, 2] = tmp[1]
+    ddt_samples[i, :, :, :, 3] = tmp[2]
+
+# Save memory
+del rho_samples, J_samples
 
 # RegularGridInterpolator is a bit overkill, since we do not interpolate in
 # space, but the only way to vectorize time interpolation
-drho_dt = RegularGridInterpolator((t_deriv, x, y, z), rho_samples[:-1])
-dJx_dt = RegularGridInterpolator((t_deriv, x, y, z), J_samples[:-1, 0])
-dJy_dt = RegularGridInterpolator((t_deriv, x, y, z), J_samples[:-1, 1])
-dJz_dt = RegularGridInterpolator((t_deriv, x, y, z), J_samples[:-1, 2])
+all_derivs = RegularGridInterpolator((t_deriv, x, y, z), ddt_samples)
 
 r_obs = np.reshape(args.observation_points, [-1, 3])
 n_obs_points = len(r_obs)
@@ -73,14 +81,14 @@ def get_E_obs(t_obs, t_delay, grid_coordinates, r_hat, factor):
     coords_tuple = (t_obs-t_delay, *grid_coordinates)
 
     # Interpolate at every grid point at the given t_source
-    rho_term = drho_dt(coords_tuple)
-    J_term = np.array([dJx_dt(coords_tuple), dJy_dt(coords_tuple),
-                       dJz_dt(coords_tuple)]) / speed_of_light
+    tmp = all_derivs(coords_tuple)
+    rho_term = tmp[:, :, :, 0]
+    J_term = tmp[:, :, :, 1:] / speed_of_light
     E_obs_rho, E_obs_J = np.zeros(3), np.zeros(3)
 
     for dim in range(3):
         E_obs_rho[dim] = np.sum(factor * r_hat[dim] * rho_term)
-        E_obs_J[dim] = -np.sum(factor * J_term[dim])
+        E_obs_J[dim] = -np.sum(factor * J_term[:, :, :, dim])
 
     return E_obs_rho, E_obs_J
 
