@@ -108,42 +108,18 @@ for i, r in enumerate(r_obs):
                            dJz_dt(coords_tuple)]) / speed_of_light
 
         for dim in range(3):
-            E_obs_rho[i][k, dim] += dV * np.sum(factor * r_hat[dim] * rho_term)
-            E_obs_J[i][k, dim] -= dV * np.sum(factor * J_term[dim])
+            E_obs_rho[i][k, dim] = dV * np.sum(factor * r_hat[dim] * rho_term)
+            E_obs_J[i][k, dim] = dV * np.sum(factor * J_term[dim])
 
-    # Save to text file
-    header = 'time E_rho_x E_rho_y E_rho_z E_J_x E_J_y E_J_z'
-    fname = file_prefix + f'_observer_{r[0]}_{r[1]}_{r[2]}.txt'
-    np.savetxt(fname,
-               np.array([t_obs, E_obs_rho[i][:, 0],
-                         E_obs_rho[i][:, 1], E_obs_rho[i][:, 2],
-                         E_obs_J[i][:, 0], E_obs_J[i][:, 1],
-                         E_obs_J[i][:, 2]]).T, header=header)
+    # Save to csv file
+    header = 't_obs,t_src,E_rho_x,E_rho_y,E_rho_z,E_J_x,E_J_y,E_J_z'
+    fname = file_prefix + f'_observer_{r[0]}_{r[1]}_{r[2]}.csv'
+    all_data = np.array([t_obs, t_obs-delays[i].mean(),
+                         E_obs_rho[i][:, 0],
+                         E_obs_rho[i][:, 1],
+                         E_obs_rho[i][:, 2],
+                         E_obs_J[i][:, 0],
+                         E_obs_J[i][:, 1],
+                         E_obs_J[i][:, 2]]).T
+    np.savetxt(fname, all_data, header=header, comments='', delimiter=',')
     print(f'Wrote {fname}')
-
-
-fig, ax = plt.subplots(n_obs_points, 3, sharex='row', sharey=True)
-if ax.ndim == 1:
-    ax = ax[None, :]
-
-for i, r in enumerate(r_obs):
-    t_obs = t_obs_array[i]
-    ax[i, 0].plot(t_obs, E_obs_rho[i][:, 0], label='Ex')
-    ax[i, 0].plot(t_obs, E_obs_rho[i][:, 1], label='Ey')
-    ax[i, 0].plot(t_obs, E_obs_rho[i][:, 2], label='Ez')
-    ax[i, 0].legend()
-    ax[i, 0].set_title(f'Observer {i+1} at {r} (rho)')
-
-    ax[i, 1].plot(t_obs, E_obs_J[i][:, 0], label='Ex')
-    ax[i, 1].plot(t_obs, E_obs_J[i][:, 1], label='Ey')
-    ax[i, 1].plot(t_obs, E_obs_J[i][:, 2], label='Ez')
-    ax[i, 1].legend()
-    ax[i, 1].set_title(f'Observer {i+1} at {r} (J)')
-
-    ax[i, 2].plot(t_obs, E_obs_rho[i][:, 0] + E_obs_J[i][:, 0], label='Ex')
-    ax[i, 2].plot(t_obs, E_obs_rho[i][:, 1] + E_obs_J[i][:, 1], label='Ey')
-    ax[i, 2].plot(t_obs, E_obs_rho[i][:, 2] + E_obs_J[i][:, 2], label='Ez')
-    ax[i, 2].legend()
-    ax[i, 2].set_title(f'Observer {i+1} at {r} (total)')
-
-plt.show()

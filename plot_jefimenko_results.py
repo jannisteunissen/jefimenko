@@ -12,7 +12,7 @@ p = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     description='Numerical solution to Jefimenko equations')
 p.add_argument('data_files', type=str, nargs="+",
-               help='''Files of different points to visualize''')
+               help='''CSV files of different points to visualize''')
 p.add_argument('-filter_width', type=int, default=0,
                help='''Odd number, if > 0, apply savgol_filter''')
 p.add_argument('-filter_order', type=int, default=1,
@@ -43,10 +43,11 @@ for i, f in enumerate(args.data_files):
     r = ' '.join(tmp.split('_'))
 
     # Reading the File
-    data = np.loadtxt(f)
+    data = np.loadtxt(f, delimiter=',', skiprows=1)
     t_obs = data[:, 0]
-    E_obs_rho = data[:, 1:4]
-    E_obs_J = data[:, 4:]
+    t_src = data[:, 1]
+    E_obs_rho = data[:, 2:5]
+    E_obs_J = data[:, 5:]
     ax[i, 0].plot(t_obs, custom_filter(E_obs_rho[:, 0]), label='Ex')
     ax[i, 0].plot(t_obs, custom_filter(E_obs_rho[:, 1]), label='Ey')
     ax[i, 0].plot(t_obs, custom_filter(E_obs_rho[:, 2]), label='Ez')
