@@ -25,33 +25,34 @@ file_prefix = splitext(args.npz)[0]
 npz_file = np.load(args.npz)
 t = npz_file['t']
 x, y, z = npz_file['x'], npz_file['y'], npz_file['z']
-rho_samples = npz_file['rho']
-J_samples = npz_file['J']
 
 # Assume constant dx
 dx = np.array([x[1] - x[0], y[1] - y[0], z[1] - z[0]])
 dV = np.product(dx)
-grid_size = rho_samples.shape[1:]
 grid_coordinates = np.meshgrid(x, y, z, indexing='ij', sparse=True)
 
 # Take time derivatives at center of time intervals. They are second order
 # accurate, and as local as possible (compared to e.g. central differencing)
 N_t = len(t) - 1
 t_deriv = 0.5 * (t[:-1] + t[1:])
-rho_deriv = np.zeros((N_t, *grid_size))
-J_deriv = np.zeros((N_t, 3, *grid_size))
 
-for i in range(len(t) - 1):
+# Load all data
+rho_samples = npz_file['rho']
+J_samples = npz_file['J']
+grid_size = rho_samples.shape[1:]
+
+# Compute time derivative and change original arrays to save memory
+for i in range(N_t-1):
     inv_dt = 1/(t[i+1] - t[i])
-    rho_deriv[i] = (rho_samples[i+1] - rho_samples[i]) * inv_dt
-    J_deriv[i] = (J_samples[i+1] - J_samples[i]) * inv_dt
+    rho_samples[i] = (rho_samples[i+1] - rho_samples[i]) * inv_dt
+    J_samples[i] = (J_samples[i+1] - J_samples[i]) * inv_dt
 
 # RegularGridInterpolator is a bit overkill, since we do not interpolate in
 # space, but the only way to vectorize time interpolation
-drho_dt = RegularGridInterpolator((t_deriv, x, y, z), rho_deriv)
-dJx_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 0])
-dJy_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 1])
-dJz_dt = RegularGridInterpolator((t_deriv, x, y, z), J_deriv[:, 2])
+drho_dt = RegularGridInterpolator((t_deriv, x, y, z), rho_samples[:-1])
+dJx_dt = RegularGridInterpolator((t_deriv, x, y, z), J_samples[:-1, 0])
+dJy_dt = RegularGridInterpolator((t_deriv, x, y, z), J_samples[:-1, 1])
+dJz_dt = RegularGridInterpolator((t_deriv, x, y, z), J_samples[:-1, 2])
 
 r_obs = np.reshape(args.observation_points, [-1, 3])
 n_obs_points = len(r_obs)
@@ -109,7 +110,7 @@ for i, r in enumerate(r_obs):
         return get_E_obs(t_obs, delays[i], grid_coordinates, r_hat, factor)
 
     with Pool(args.np) as p:
-        tmp = p.map(get_E_obs_for_point, t_obs)
+        tmp = p.map(get_E_obs_for_point, t_obs, chunksize=1)
         E_obs_combined = np.array(tmp)
         E_obs_rho, E_obs_J = E_obs_combined[:, 0], E_obs_combined[:, 1]
 
