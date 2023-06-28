@@ -2,12 +2,11 @@
 
 import numpy as np
 from numpy.linalg import norm
-import matplotlib.pyplot as plt
 import argparse
-from tqdm import tqdm
 from scipy.interpolate import RegularGridInterpolator
 from scipy.constants import speed_of_light, epsilon_0
 from os.path import splitext
+from multiprocessing import Pool
 
 p = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -18,6 +17,8 @@ p.add_argument('npz', type=str,
                grid coordinate arrays x, y, z''')
 p.add_argument('-observation_points', type=float, nargs='+', required=True,
                help='N*3 coordinates of outside observation points')
+p.add_argument('-np', type=int, default=4,
+               help='Number of threads/cores to use')
 args = p.parse_args()
 
 file_prefix = splitext(args.npz)[0]
@@ -45,7 +46,6 @@ for i in range(len(t) - 1):
     rho_deriv[i] = (rho_samples[i+1] - rho_samples[i]) * inv_dt
     J_deriv[i] = (J_samples[i+1] - J_samples[i]) * inv_dt
 
-
 # RegularGridInterpolator is a bit overkill, since we do not interpolate in
 # space, but the only way to vectorize time interpolation
 drho_dt = RegularGridInterpolator((t_deriv, x, y, z), rho_deriv)
@@ -67,11 +67,22 @@ for i, r in enumerate(r_obs):
         r_diff[i, dim] = r[dim] - grid_coordinates[dim]
     delays[i] = norm(r_diff[i], axis=0)/speed_of_light
 
-E_obs_rho = []
-E_obs_J = []
-t_obs_array = []
-coords = grid_coordinates
-coords.insert(0, [])            # Dummy entry for time values
+
+def get_E_obs(t_obs, t_delay, grid_coordinates, r_hat, factor):
+    coords_tuple = (t_obs-t_delay, *grid_coordinates)
+
+    # Interpolate at every grid point at the given t_source
+    rho_term = drho_dt(coords_tuple)
+    J_term = np.array([dJx_dt(coords_tuple), dJy_dt(coords_tuple),
+                       dJz_dt(coords_tuple)]) / speed_of_light
+    E_obs_rho, E_obs_J = np.zeros(3), np.zeros(3)
+
+    for dim in range(3):
+        E_obs_rho[dim] = np.sum(factor * r_hat[dim] * rho_term)
+        E_obs_J[dim] = -np.sum(factor * J_term[dim])
+
+    return E_obs_rho, E_obs_J
+
 
 for i, r in enumerate(r_obs):
     # Observation time range
@@ -87,39 +98,26 @@ for i, r in enumerate(r_obs):
         raise ValueError(f"Not enough observation time for point {r}")
 
     t_obs = np.linspace(t_obs_min, t_obs_max, n_obs_times)
-    t_obs_array.append(t_obs)
-
-    E_obs_rho.append(np.zeros((n_obs_times, 3)))
-    E_obs_J.append(np.zeros((n_obs_times, 3)))
 
     # R is |r - r'| for each grid point
     R = delays[i] * speed_of_light
-    factor = 1 / (4 * np.pi * epsilon_0 * speed_of_light * R)
+    factor = dV / (4 * np.pi * epsilon_0 * speed_of_light * R)
     r_hat = r_diff[i] / R
 
-    for k, t_o in enumerate(tqdm(t_obs)):
-        # Time at source
-        coords[0] = t_o - delays[i]
-        coords_tuple = tuple(coords)
+    # Helper function
+    def get_E_obs_for_point(t_obs):
+        return get_E_obs(t_obs, delays[i], grid_coordinates, r_hat, factor)
 
-        # Interpolate at every grid point at the given t_source
-        rho_term = drho_dt(coords_tuple)
-        J_term = np.array([dJx_dt(coords_tuple), dJy_dt(coords_tuple),
-                           dJz_dt(coords_tuple)]) / speed_of_light
-
-        for dim in range(3):
-            E_obs_rho[i][k, dim] = dV * np.sum(factor * r_hat[dim] * rho_term)
-            E_obs_J[i][k, dim] = dV * np.sum(factor * J_term[dim])
+    with Pool(args.np) as p:
+        tmp = p.map(get_E_obs_for_point, t_obs)
+        E_obs_combined = np.array(tmp)
+        E_obs_rho, E_obs_J = E_obs_combined[:, 0], E_obs_combined[:, 1]
 
     # Save to csv file
     header = 't_obs,t_src,E_rho_x,E_rho_y,E_rho_z,E_J_x,E_J_y,E_J_z'
     fname = file_prefix + f'_observer_{r[0]}_{r[1]}_{r[2]}.csv'
     all_data = np.array([t_obs, t_obs-delays[i].mean(),
-                         E_obs_rho[i][:, 0],
-                         E_obs_rho[i][:, 1],
-                         E_obs_rho[i][:, 2],
-                         E_obs_J[i][:, 0],
-                         E_obs_J[i][:, 1],
-                         E_obs_J[i][:, 2]]).T
+                         E_obs_rho[:, 0], E_obs_rho[:, 1], E_obs_rho[:, 2],
+                         E_obs_J[:, 0], E_obs_J[:, 1], E_obs_J[:, 2]]).T
     np.savetxt(fname, all_data, header=header, comments='', delimiter=',')
     print(f'Wrote {fname}')

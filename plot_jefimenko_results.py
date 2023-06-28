@@ -48,22 +48,22 @@ for i, f in enumerate(args.data_files):
     t_src = data[:, 1]
     E_obs_rho = data[:, 2:5]
     E_obs_J = data[:, 5:]
-    ax[i, 0].plot(t_obs, custom_filter(E_obs_rho[:, 0]), label='Ex')
-    ax[i, 0].plot(t_obs, custom_filter(E_obs_rho[:, 1]), label='Ey')
-    ax[i, 0].plot(t_obs, custom_filter(E_obs_rho[:, 2]), label='Ez')
+    ax[i, 0].plot(t_src, custom_filter(E_obs_rho[:, 0]), label='Ex')
+    ax[i, 0].plot(t_src, custom_filter(E_obs_rho[:, 1]), label='Ey')
+    ax[i, 0].plot(t_src, custom_filter(E_obs_rho[:, 2]), label='Ez')
     tmp = savgol_filter(E_obs_rho[:, 2], 13, 1)
     ax[i, 0].legend()
     ax[i, 0].set_ylabel('E (V/m)')
 
-    ax[i, 1].plot(t_obs, custom_filter(E_obs_J[:, 0]), label='Ex')
-    ax[i, 1].plot(t_obs, custom_filter(E_obs_J[:, 1]), label='Ey')
-    ax[i, 1].plot(t_obs, custom_filter(E_obs_J[:, 2]), label='Ez')
+    ax[i, 1].plot(t_src, custom_filter(E_obs_J[:, 0]), label='Ex')
+    ax[i, 1].plot(t_src, custom_filter(E_obs_J[:, 1]), label='Ey')
+    ax[i, 1].plot(t_src, custom_filter(E_obs_J[:, 2]), label='Ez')
 
-    ax[i, 2].plot(t_obs, custom_filter(E_obs_rho[:, 0] + E_obs_J[:, 0]),
+    ax[i, 2].plot(t_src, custom_filter(E_obs_rho[:, 0] + E_obs_J[:, 0]),
                   label='Ex')
-    ax[i, 2].plot(t_obs, custom_filter(E_obs_rho[:, 1] + E_obs_J[:, 1]),
+    ax[i, 2].plot(t_src, custom_filter(E_obs_rho[:, 1] + E_obs_J[:, 1]),
                   label='Ey')
-    ax[i, 2].plot(t_obs, custom_filter(E_obs_rho[:, 2] + E_obs_J[:, 2]),
+    ax[i, 2].plot(t_src, custom_filter(E_obs_rho[:, 2] + E_obs_J[:, 2]),
                   label='Ez')
 
     ax[i, 2].text(1.1, 0.5, r'$r_\mathrm{obs}$ = ' + r,
@@ -73,7 +73,7 @@ for i, f in enumerate(args.data_files):
 
     # Power spectrum
     freq, Pxx_den = welch(custom_filter(E_obs_rho[:, 2]),
-                          1/(t_obs[1] - t_obs[0]))
+                          1/(t_src[1] - t_src[0]))
     ax2[i].semilogy(freq * 1e-6, Pxx_den)
     ax2[i].set_xlabel('Frequency (MHz)')
     ax2[i].set_ylabel('PSD [V**2/Hz]')
