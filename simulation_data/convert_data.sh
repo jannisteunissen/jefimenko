@@ -11,7 +11,7 @@ resolution=$1
 shift
 silo_files="$@"
 
-script_dir=~/git/afivo/tools/
+script_dir=/export/scratch2/hemadity/afivo-streamer_new_rep_pulses/afivo/tools/
 vars="rhs Je_1 Je_2 Je_3"
 r_min="0.06 0.06 0.05"
 r_max="0.14 0.14 0.2"
