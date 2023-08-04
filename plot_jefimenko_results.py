@@ -17,7 +17,7 @@ p.add_argument('-filter_width', type=int, default=0,
                help='''Odd number, if > 0, apply savgol_filter''')
 p.add_argument('-filter_order', type=int, default=1,
                help='''Order of the filter''')
-p.add_argument('-save_figs', type=str, default="out_Efld/spectrum.png",
+p.add_argument('-save_figs', type=str, default="out_Efldspectrum.png",
                     help='Save the figures generated as a png')
 args = p.parse_args()
 
@@ -91,8 +91,13 @@ ax[-1, 1].set_xlabel('t (s)')
 ax[-1, 2].set_xlabel('t (s)')
 
 #Saving the figures
-fig.savefig(args.save_figs+"_Efld.png", dpi=100)
-fig2.savefig(args.save_figs+"_spectrum.png", dpi=100)
+if args.save_figs.startswith("out"):
+    fig.savefig("out_Efld.png", dpi=100)
+    fig2.savefig("out_spectrum.png", dpi=100)
+else:
+    fig.savefig(args.save_figs+"_Efld.png", dpi=100)
+    fig2.savefig(args.save_figs+"_spectrum.png", dpi=100)
+    
 
 plt.tight_layout()
 plt.show()
