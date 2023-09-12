@@ -42,7 +42,7 @@ J_samples = npz_file['J']
 grid_size = rho_samples.shape[1:]
 
 # One large array for derivatives
-ddt_samples = np.zeros((N_t, *grid_size, 4))
+ddt_samples = np.zeros((N_t, *grid_size, 5))
 
 # Compute time derivative
 for i in range(N_t):
@@ -54,6 +54,7 @@ for i in range(N_t):
     ddt_samples[i, :, :, :, 1] = tmp[0]
     ddt_samples[i, :, :, :, 2] = tmp[1]
     ddt_samples[i, :, :, :, 3] = tmp[2]
+    ddt_samples[i, :, :, :, 4] = rho_samples[i]
 
 # Save memory
 del rho_samples, J_samples
@@ -77,20 +78,23 @@ for i, r in enumerate(r_obs):
     delays[i] = norm(r_diff[i], axis=0)/speed_of_light
 
 
-def get_E_obs(t_obs, t_delay, grid_coordinates, r_hat, factor):
+def get_E_obs(t_obs, t_delay, grid_coordinates, r_hat, r_diff_norm, factor):
     coords_tuple = (t_obs-t_delay, *grid_coordinates)
 
     # Interpolate at every grid point at the given t_source
     tmp = all_derivs(coords_tuple)
+    space_term = tmp[:, :, :, 4]
     rho_term = tmp[:, :, :, 0]
-    J_term = tmp[:, :, :, 1:] / speed_of_light
-    E_obs_rho, E_obs_J = np.zeros(3), np.zeros(3)
+    J_term = tmp[:, :, :, 1:4] / speed_of_light
+    E_obs_space, E_obs_rho, E_obs_J = np.zeros(3), np.zeros(3), np.zeros(3)
 
     for dim in range(3):
+        E_obs_space[dim] = np.sum(factor * speed_of_light * r_hat[dim] *
+                                  space_term * (1.0/r_diff_norm))
         E_obs_rho[dim] = np.sum(factor * r_hat[dim] * rho_term)
         E_obs_J[dim] = -np.sum(factor * J_term[:, :, :, dim])
 
-    return E_obs_rho, E_obs_J
+    return E_obs_space, E_obs_rho, E_obs_J
 
 
 for i, r in enumerate(r_obs):
@@ -115,17 +119,18 @@ for i, r in enumerate(r_obs):
 
     # Helper function
     def get_E_obs_for_point(t_obs):
-        return get_E_obs(t_obs, delays[i], grid_coordinates, r_hat, factor)
+        return get_E_obs(t_obs, delays[i], grid_coordinates, r_hat, R, factor)
 
     with Pool(args.np) as p:
         tmp = p.map(get_E_obs_for_point, t_obs, chunksize=1)
         E_obs_combined = np.array(tmp)
-        E_obs_rho, E_obs_J = E_obs_combined[:, 0], E_obs_combined[:, 1]
+        E_obs_space, E_obs_rho, E_obs_J = E_obs_combined[:, 0], E_obs_combined[:, 1]
 
     # Save to csv file
     header = 't_obs,t_src,E_rho_x,E_rho_y,E_rho_z,E_J_x,E_J_y,E_J_z'
     fname = file_prefix + f'_observer_{r[0]}_{r[1]}_{r[2]}.csv'
     all_data = np.array([t_obs, t_obs-delays[i].mean(),
+                         E_obs_space[:, 0], E_obs_space[:, 1], E_obs_space[:, 2],
                          E_obs_rho[:, 0], E_obs_rho[:, 1], E_obs_rho[:, 2],
                          E_obs_J[:, 0], E_obs_J[:, 1], E_obs_J[:, 2]]).T
     np.savetxt(fname, all_data, header=header, comments='', delimiter=',')
