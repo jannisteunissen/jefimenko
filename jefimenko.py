@@ -124,10 +124,10 @@ for i, r in enumerate(r_obs):
     with Pool(args.np) as p:
         tmp = p.map(get_E_obs_for_point, t_obs, chunksize=1)
         E_obs_combined = np.array(tmp)
-        E_obs_space, E_obs_rho, E_obs_J = E_obs_combined[:, 0], E_obs_combined[:, 1]
+        E_obs_space, E_obs_rho, E_obs_J = E_obs_combined[:, 0], E_obs_combined[:, 1], E_obs_combined[:,2]
 
     # Save to csv file
-    header = 't_obs,t_src,E_rho_x,E_rho_y,E_rho_z,E_J_x,E_J_y,E_J_z'
+    header = 't_obs,t_src,E_space_x,E_space_y,E_space_z, E_rho_x,E_rho_y,E_rho_z,E_J_x,E_J_y,E_J_z'
     fname = file_prefix + f'_observer_{r[0]}_{r[1]}_{r[2]}.csv'
     all_data = np.array([t_obs, t_obs-delays[i].mean(),
                          E_obs_space[:, 0], E_obs_space[:, 1], E_obs_space[:, 2],
