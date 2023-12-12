@@ -76,8 +76,8 @@ program jefimenko
   delay_from_center = 0.0_dp
 
   open(newunit=my_unit, file=trim(outname), action="write")
-  write(my_unit, "(A)") 't_obs,t_src,E_static_x,E_static_y,E_static_z,E_rho_x,'&
-       &'E_rho_y,E_rho_z,E_J_x,E_J_y,E_J_z'
+  write(my_unit, "(A)") 't_obs,t_src,E_static_x,E_static_y,E_static_z,E_rho_x,&
+       &E_rho_y,E_rho_z,E_J_x,E_J_y,E_J_z'
 
   do i = i_start, i_end
      write(*, "(A,I0,A,I0)") "At index: ", i, "/", i_end
