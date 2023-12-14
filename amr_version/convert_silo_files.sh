@@ -26,6 +26,6 @@ for ((i="$2"; i<="$3"; i++)); do
         ${afivo_dir}/tools/compute_silo_derivative.py \
                     "$file_a" "$file_b" "$file_c" -deriv_type 2nd_central \
                     -output "$raw_file" -variable "$v" &
-        wait
     done
+    wait
 done
